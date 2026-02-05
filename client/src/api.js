@@ -69,6 +69,46 @@ export const fetchSubmissions = async (token) => {
   return res.json();
 };
 
+export const deleteSubmission = async (id, token) => {
+  const res = await fetch(`${API_BASE}/submissions/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || 'Submission deletion failed');
+  }
+  return res.json();
+};
+
+export const deleteSubmissions = async (ids, token) => {
+  const res = await fetch(`${API_BASE}/submissions`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ ids })
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || 'Submissions deletion failed');
+  }
+  return res.json();
+};
+
+export const deleteAllSubmissions = async (token) => {
+  const res = await fetch(`${API_BASE}/submissions?all=true`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || 'Deleting all submissions failed');
+  }
+  return res.json();
+};
+
 export const updateTask = async (taskId, payload, token) => {
   const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
     method: "PATCH",

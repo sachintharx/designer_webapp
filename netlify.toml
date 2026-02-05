@@ -1,0 +1,15 @@
+[build]
+  publish = "client/dist"
+  command = "npm --prefix client run build"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[context.production.environment]
+  # Example env placeholders; set real values in Netlify UI
+  VITE_API_URL = "https://your-api.example.com/api"
+  VITE_ADSENSE_PUB = ""
+  VITE_ADSENSE_SLOT = ""

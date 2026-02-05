@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createTask, fetchSubmissions, fetchTasks, updateTask, deleteTask } from "../api.js";
+import { createTask, fetchSubmissions, fetchTasks, updateTask, deleteTask, deleteSubmission, deleteSubmissions, deleteAllSubmissions } from "../api.js";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [selectedSubmissions, setSelectedSubmissions] = useState([]);
   const [status, setStatus] = useState({ type: "", message: "" });
   const [editingTask, setEditingTask] = useState(null);
   const [budgetAmount, setBudgetAmount] = useState("");
@@ -94,10 +95,70 @@ const AdminDashboard = () => {
     }
   };
 
+  const toggleSelectSubmission = (id) => {
+    setSelectedSubmissions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedSubmissions.length === 0) return;
+    if (!confirm(`Delete ${selectedSubmissions.length} selected submissions?`)) return;
+    try {
+      await deleteSubmissions(selectedSubmissions, token);
+      setSubmissions((prev) => prev.filter((s) => !selectedSubmissions.includes(s._id)));
+      setSelectedSubmissions([]);
+      setStatus({ type: "success", message: "Selected submissions removed." });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!confirm("Delete ALL submissions? This cannot be undone.")) return;
+    try {
+      await deleteAllSubmissions(token);
+      setSubmissions([]);
+      setSelectedSubmissions([]);
+      setStatus({ type: "success", message: "All submissions removed." });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    }
+  };
+
+  const handleDeleteSingleSubmission = async (id) => {
+    if (!confirm("Delete this submission?")) return;
+    try {
+      await deleteSubmission(id, token);
+      setSubmissions((prev) => prev.filter((s) => s._id !== id));
+      setSelectedSubmissions((prev) => prev.filter((x) => x !== id));
+      setStatus({ type: "success", message: "Submission removed." });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    }
+  };
+
   const handleCancelEdit = () => {
     setEditingTask(null);
     setStatus({ type: "", message: "" });
   };
+
+  // helpers to extract numeric parts when editing existing tasks
+  const parseBudget = (budgetStr) => {
+    if (!budgetStr) return { min: "", max: "", unit: "k" };
+    // match formats like "$2k - $4k" or "$2 - $4"
+    const m = budgetStr.match(/\$(\d+(?:\.\d+)?)([km]?)\s*-\s*\$(\d+(?:\.\d+)?)([km]?)/i);
+    if (m) return { min: m[1], max: m[3], unit: (m[2] || m[4] || "k") };
+    return { min: "", max: "", unit: "k" };
+  };
+
+  const parseDeadline = (deadlineStr) => {
+    if (!deadlineStr) return { amount: "", unit: "weeks" };
+    const m = deadlineStr.match(/(\d+)\s*(days|weeks|months)/i);
+    if (m) return { amount: m[1], unit: m[2] };
+    return { amount: "", unit: "weeks" };
+  };
+
+  const budgetParsed = parseBudget(editingTask?.budget);
+  const deadlineParsed = parseDeadline(editingTask?.deadline);
 
   return (
     <section className="page">
@@ -141,9 +202,10 @@ const AdminDashboard = () => {
                     name="budgetMin" 
                     type="number" 
                     placeholder="2" 
+                    defaultValue={editingTask ? budgetParsed.min : ""}
                     step="0.1"
                   />
-                  <select name="budgetUnit" defaultValue="k">
+                  <select name="budgetUnit" defaultValue={editingTask ? budgetParsed.unit : "k"}>
                     <option value="k">k</option>
                     <option value="m">m</option>
                   </select>
@@ -153,9 +215,10 @@ const AdminDashboard = () => {
                     name="budgetMax" 
                     type="number" 
                     placeholder="4" 
+                    defaultValue={editingTask ? budgetParsed.max : ""}
                     step="0.1"
                   />
-                  <select name="budgetUnit">
+                  <select name="budgetUnit" defaultValue={editingTask ? budgetParsed.unit : "k"}>
                     <option value="k">k</option>
                     <option value="m">m</option>
                   </select>
@@ -170,9 +233,10 @@ const AdminDashboard = () => {
                     name="deadlineAmount" 
                     type="number" 
                     placeholder="2" 
+                    defaultValue={editingTask ? deadlineParsed.amount : ""}
                     min="1"
                   />
-                  <select name="deadlineUnit" defaultValue="weeks">
+                   <select name="deadlineUnit" defaultValue={editingTask ? deadlineParsed.unit : "weeks"}>
                     <option value="days">days</option>
                     <option value="weeks">weeks</option>
                     <option value="months">months</option>
@@ -201,7 +265,17 @@ const AdminDashboard = () => {
         </div>
 
         <div className="panel">
-          <h2>Recent submissions</h2>
+          <div className="submissions-header-row">
+            <h2>Recent submissions</h2>
+            <div className="submissions-actions">
+              <button className="secondary-chip" onClick={handleDeleteSelected} disabled={selectedSubmissions.length===0}>
+                Delete selected
+              </button>
+              <button className="secondary-chip danger" onClick={handleDeleteAll}>
+                Delete all
+              </button>
+            </div>
+          </div>
           {submissions.length === 0 && (
             <p className="status">No submissions yet.</p>
           )}
@@ -209,16 +283,22 @@ const AdminDashboard = () => {
             {submissions.map((submission) => (
               <div key={submission._id} className="submission-card enhanced">
                 <div className="submission-header">
-                  <div>
-                    <h3>{submission.name}</h3>
-                    <div className="submission-meta">
-                      <span>📧 {submission.email}</span>
-                      <span>📱 {submission.phone}</span>
+                  <div style={{display:'flex', alignItems:'center', gap:12}}>
+                    <input type="checkbox" checked={selectedSubmissions.includes(submission._id)} onChange={() => toggleSelectSubmission(submission._id)} />
+                    <div>
+                      <h3>{submission.name}</h3>
+                      <div className="submission-meta">
+                        <span>📧 {submission.email}</span>
+                        <span>📱 {submission.phone}</span>
+                      </div>
                     </div>
                   </div>
-                  <span className={`experience-badge ${submission.experienceLevel}`}>
-                    {submission.experienceLevel}
-                  </span>
+                  <div style={{display:'flex', alignItems:'center', gap:12}}>
+                    <span className={`experience-badge ${submission.experienceLevel}`}>
+                      {submission.experienceLevel}
+                    </span>
+                    <button className="action-button delete" onClick={() => handleDeleteSingleSubmission(submission._id)} title="Delete submission">🗑️</button>
+                  </div>
                 </div>
                 
                 <div className="submission-details">

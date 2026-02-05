@@ -43,6 +43,25 @@ router.post("/:taskId", upload.single("sampleFile"), async (req, res) => {
     sampleFilePath: req.file ? `/uploads/${req.file.filename}` : ""
   });
 
+  // after creating, ensure we keep only the most recent 90 submissions
+  try {
+    const total = await Submission.countDocuments();
+    const maxKeep = 90;
+    if (total > maxKeep) {
+      const toRemove = await Submission.find()
+        .sort({ createdAt: 1 })
+        .limit(total - maxKeep)
+        .select("_id");
+      const ids = toRemove.map((d) => d._id);
+      if (ids.length) {
+        await Submission.deleteMany({ _id: { $in: ids } });
+      }
+    }
+  } catch (err) {
+    // don't fail the submission if cleanup fails; log and continue
+    console.error("Submission cleanup failed:", err);
+  }
+
   return res.status(201).json(submission);
 });
 
@@ -52,6 +71,40 @@ router.get("/", requireAdmin, async (req, res) => {
     .sort({ createdAt: -1 });
 
   return res.json(submissions);
+});
+
+// delete a single submission
+router.delete('/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const removed = await Submission.findByIdAndDelete(id);
+    if (!removed) return res.status(404).json({ message: 'Not found' });
+    return res.json({ message: 'Deleted' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// delete multiple submissions or all
+router.delete('/', requireAdmin, async (req, res) => {
+  try {
+    // support ?all=true to remove all submissions
+    if (req.query.all === 'true') {
+      await Submission.deleteMany({});
+      return res.json({ message: 'All submissions removed' });
+    }
+
+    // otherwise expect body.ids = [id1,id2,...]
+    const ids = req.body && req.body.ids ? req.body.ids : [];
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No ids provided' });
+    }
+
+    await Submission.deleteMany({ _id: { $in: ids } });
+    return res.json({ message: 'Deleted selected' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 });
 
 export default router;

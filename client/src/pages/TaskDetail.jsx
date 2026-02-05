@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { fetchTasks, submitRequest } from "../api.js";
 
 const TaskDetail = () => {
@@ -11,6 +11,28 @@ const TaskDetail = () => {
   const [charCount, setCharCount] = useState(0);
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [customSkill, setCustomSkill] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // when success modal opens, scroll it into view and focus primary action
+  useEffect(() => {
+    if (showSuccess) {
+      setTimeout(() => {
+        const modal = document.querySelector(".success-card");
+        if (modal && modal.scrollIntoView) {
+          modal.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        const primary = document.querySelector(".success-card .primary-button");
+        if (primary && primary.focus) primary.focus();
+        // prevent background scroll while modal is open
+        document.body.style.overflow = "hidden";
+      }, 60);
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showSuccess]);
 
   useEffect(() => {
     fetchTasks()
@@ -41,6 +63,7 @@ const TaskDetail = () => {
       setSelectedSkills([]);
       setCustomSkill("");
       setStatus({ type: "success", message: "Request sent successfully. We'll contact you soon!" });
+      setShowSuccess(true);
     } catch (error) {
       setStatus({ type: "error", message: error.message });
     } finally {
@@ -99,10 +122,33 @@ const TaskDetail = () => {
           <h1>{task.title}</h1>
           <p className="hero-copy">{task.brief}</p>
         </div>
-        <div className="detail-meta">
-          <span>Budget: {task.budget || "Flexible"}</span>
-          <span>Deadline: {task.deadline || "Open"}</span>
-          <span>Status: {task.status}</span>
+        <div className="meta-card">
+          <div className="meta-left">
+            <div className="meta-icon" aria-hidden>💼</div>
+            <div className="meta-block">
+              <div className="meta-label">Budget</div>
+              <div className="meta-value">{task.budget || "Flexible"}</div>
+            </div>
+          </div>
+
+          <div className="meta-center">
+            <div className="meta-label">Deadline</div>
+            <div className="meta-value">{task.deadline || "Open"}</div>
+            <div className="deadline-progress" aria-hidden>
+              <div className="deadline-progress-fill" style={{ width: '40%' }}></div>
+            </div>
+          </div>
+
+          <div className="meta-right">
+            <div className={`status-pill ${task.status === "open" ? "pill-open" : "pill-closed"}`}>
+              <span className={`status-dot ${task.status === "open" ? "status-open" : "status-closed"}`}></span>
+              <span className="status-text">{task.status}</span>
+            </div>
+            <div className="meta-actions">
+              <Link to="/" className="secondary-chip">Browse tasks</Link>
+              <a href={`mailto:${task.contactEmail || 'hello@designhub.example'}`} className="secondary-chip">Contact</a>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -268,7 +314,7 @@ const TaskDetail = () => {
             </>
           ) : (
             <>
-              🚀 Submit application
+              Submit application
             </>
           )}
         </button>
@@ -277,6 +323,18 @@ const TaskDetail = () => {
           <div className={`alert alert-${status.type}`}>
             <span className="alert-icon">{status.type === "success" ? "✅" : "⚠️"}</span>
             {status.message}
+          </div>
+        )}
+        {showSuccess && (
+          <div className="success-modal" role="dialog" aria-modal="true">
+            <div className="success-card">
+              <h3>Submission received</h3>
+              <p>Thanks - your application has been submitted. The task poster will review your materials and contact you if there's a match.</p>
+              <div className="success-actions">
+                <Link to="/" className="primary-button">Browse other tasks</Link>
+                <button type="button" className="secondary-button" onClick={() => setShowSuccess(false)}>Close</button>
+              </div>
+            </div>
           </div>
         )}
       </form>
