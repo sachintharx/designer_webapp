@@ -30,9 +30,9 @@ What you must do (step-by-step)
 
 3) Configure Netlify for the frontend
    - In Netlify dashboard, create a new site → Import from Git → select your repo.
-   - If Netlify doesn't auto-detect settings, set:
-     - Build command: `npm --prefix client run build`
-     - Publish directory: `client/dist`
+   - The build command in `netlify.toml` is: `npm --prefix client ci && npm --prefix client run build`
+     - This installs client dependencies first, then builds the Vite app.
+   - Publish directory is automatically set to `client/dist` via netlify.toml.
    - In Site settings → Build & deploy → Environment → Environment variables, add:
      - `VITE_API_URL` = `https://your-api-url.example.com/api`
      - `VITE_ADSENSE_PUB` and `VITE_ADSENSE_SLOT` if using ads
