@@ -16,7 +16,20 @@ const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(cors({ origin: clientOrigin }));
+// CORS: allow multiple origins (production + local dev)
+const allowedOrigins = clientOrigin.split(',').map(o => o.trim());
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 
