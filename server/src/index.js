@@ -39,6 +39,11 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/submissions", submissionRoutes);
 
+
+app.get("/", (req, res) => {
+  res.send("Server is running successfully 🚀");
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
